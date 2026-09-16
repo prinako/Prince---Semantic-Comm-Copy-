@@ -58,12 +58,22 @@ Federated Learning;
 % INTRO
 Modern Machine Learning 
 
+\section{Related Work}
+
+Deep learning-based semantic communication has attracted increasing attention as an alternative to conventional communication systems that primarily optimize bit-level reconstruction. Xie \textit{et al.} proposed DeepSC, an end-to-end semantic communication framework for text transmission based on the Transformer architecture \cite{xie2021deepsc}. DeepSC jointly learns semantic and channel representations and demonstrated improved robustness over conventional communication schemes, particularly under adverse channel conditions.
+
+Following DeepSC, several studies extended semantic communication toward task-oriented and multi-user scenarios. Xie \textit{et al.} introduced Transformer-based semantic communication architectures for image retrieval, machine translation, and visual question answering \cite{xie2022task}. In particular, DeepSC-MT demonstrated that semantic communication can be integrated with language translation, allowing the receiver to recover the intended semantic information in another language.
+
+Multilingual semantic communication has recently received further attention. Cheng \textit{et al.} proposed a multilingual text semantic communication framework that extends a monolingual text communication system using centralized and federated learning strategies \cite{cheng2025multilingual}. Their approach learns multilingual representations from either a mixed-language dataset or distributed language-specific datasets. Although this work demonstrates the feasibility of multilingual semantic communication, extending the system requires multilingual training of the communication model. Efficient adaptation of an already trained semantic communication model to an additional language therefore remains an important direction.
+
+Parameter-efficient fine-tuning provides a potential solution to this problem. Hu \textit{et al.} introduced Low-Rank Adaptation (LoRA), which freezes the pretrained model parameters and introduces trainable low-rank matrices into selected Transformer layers \cite{hu2022lora}. By restricting the adaptation to a small subset of parameters, LoRA substantially reduces the computational and storage requirements associated with conventional full fine-tuning. Motivated by this property, this work investigates LoRA for language adaptation in text semantic communication, enabling a pretrained semantic communication model to acquire Portuguese-language capabilities while retaining most of its original parameters.
+
 \section*{Acknowledgement}
 This research was funded by CNPq (Brazil), under grants \#444978/2024-0, 201007/2025-8 and \#405026/2024-2.
 
 
 
 \bibliographystyle{ieeetr}
-\bibliography{paper}
+\bibliography{paper,related_work}
 
 \end{document}
