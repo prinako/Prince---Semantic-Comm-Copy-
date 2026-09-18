@@ -17,7 +17,7 @@
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning}
+\usetikzlibrary{arrows.meta,positioning,calc}
 
 \usepackage[ruled,vlined,linesnumbered]{algorithm2e}
 
@@ -68,45 +68,68 @@ Subsequent studies investigated semantic communication in multi-user and receive
 
 Another research direction concerns cross-lingual and multilingual semantic communication. Xie \textit{et al.} investigated task-oriented semantic communication, including DeepSC-MT for machine translation \cite{xie2022task}. Cheng \textit{et al.} subsequently proposed a multilingual text semantic communication framework based on centralized and federated learning strategies \cite{cheng2025multilingual}. These studies demonstrate that semantic communication can operate across languages, but they rely on task-specific translation or multilingual training procedures. Efficiently extending an already trained text semantic communication model to an additional language while preserving most of its original parameters therefore remains a relevant problem.
 
-Parameter-efficient fine-tuning offers a complementary approach to model adaptation. Hu \textit{et al.} introduced Low-Rank Adaptation (LoRA), which freezes pretrained weights and learns low-rank updates for selected Transformer layers, substantially reducing the number of trainable parameters compared with full fine-tuning \cite{hu2022lora}. Building on the above directions, this work investigates the combination of KD and LoRA for adapting a pretrained text semantic communication model to Portuguese. The objective is to preserve the knowledge encoded by the original semantic communication model while enabling language-specific adaptation with a reduced number of trainable parameters.
+Parameter-efficient fine-tuning offers a complementary approach to model adaptation. Hu \textit{et al.} introduced Low-Rank Adaptation (LoRA), which freezes pretrained weights and learns low-rank updates for selected Transformer layers, substantially reducing the number of trainable parameters compared with full fine-tuning \cite{hu2022lora}. Building on the above directions, this work investigates a shared-transmitter semantic communication architecture in which compact Student receivers are obtained through KD and subsequently personalized through LoRA. The shared semantic and channel encoders are retained across receivers, whereas each receiver can be specialized for a target language or application domain. Portuguese is used as the current experimental specialization.
 
 \section{System Model and Proposed Method}
 
-\subsection{System Overview}
+\subsection{Shared Transmitter and Personalized Receiver Architecture}
 
-We consider a text semantic communication system in which a pretrained semantic transmitter is retained while the receiver is adapted to recover semantic information in a target language. The communication architecture follows the DeepSC paradigm \cite{xie2021deepsc} and consists of a semantic encoder, a channel encoder, a physical wireless channel, a channel decoder, and a Transformer-based semantic decoder.
+We consider a text semantic communication system with one shared transmitter and a set of personalized receivers. The communication architecture follows the DeepSC paradigm \cite{xie2021deepsc}. The shared transmitter contains the semantic encoder and channel encoder, while each receiver contains its own channel decoder, Transformer-based semantic decoder, and output prediction layer. Let the receiver set be
+\begin{equation}
+    \mathcal{R}
+    =
+    \left\{
+        \mathcal{R}_1,
+        \mathcal{R}_2,
+        \ldots,
+        \mathcal{R}_K
+    \right\},
+\end{equation}
+where receiver $\mathcal{R}_k$ can be personalized for a particular target language or application domain. Examples include Portuguese, Spanish, French, or a domain-specific receiver. In the current experimental evaluation, Portuguese is considered as the target specialization, while the remaining cases represent the general architecture.
 
 Let the source sentence be represented by
 \begin{equation}
     \mathbf{s}=[w_1,w_2,\ldots,w_N],
 \end{equation}
-where $w_i$ denotes the $i$-th token of the input sentence. The semantic encoder $S_{\theta_s}(\cdot)$ maps the source sequence into a latent semantic representation
+where $w_i$ denotes the $i$-th token of the input sentence. The shared semantic encoder $S_{\theta_s}(\cdot)$ maps the source sequence into a latent semantic representation
 \begin{equation}
     \mathbf{h}=S_{\theta_s}(\mathbf{s}).
 \end{equation}
-The channel encoder $C_{\theta_c}(\cdot)$ subsequently transforms this representation into channel symbols,
+The shared channel encoder $C_{\theta_c}(\cdot)$ subsequently transforms this representation into channel symbols,
 \begin{equation}
     \mathbf{x}=C_{\theta_c}(\mathbf{h}).
 \end{equation}
-Before transmission, the channel symbols are power normalized. The received representation is written as
+Before transmission, the channel symbols are power normalized. For receiver $k$, the received representation is written as
 \begin{equation}
-    \mathbf{y}=\mathcal{H}(\mathbf{x})+\mathbf{n},
+    \mathbf{y}_k
+    =
+    \mathcal{H}_k(\mathbf{x})
+    +
+    \mathbf{n}_k,
 \end{equation}
-where $\mathcal{H}(\cdot)$ denotes the considered channel transformation and $\mathbf{n}$ denotes channel noise. The implementation supports additive white Gaussian noise (AWGN), Rayleigh fading, and Rician fading channels.
+where $\mathcal{H}_k(\cdot)$ denotes the channel transformation associated with receiver $k$ and $\mathbf{n}_k$ denotes channel noise. The implementation supports additive white Gaussian noise (AWGN), Rayleigh fading, and Rician fading channels.
 
-At the receiver, the channel decoder $C^{-1}_{\phi_c}(\cdot)$ reconstructs a semantic representation,
+At receiver $k$, the channel decoder reconstructs a semantic representation,
 \begin{equation}
-    \hat{\mathbf{h}}=C^{-1}_{\phi_c}(\mathbf{y}),
+    \hat{\mathbf{h}}_k
+    =
+    C^{-1}_{\phi_{c,k}}(\mathbf{y}_k),
 \end{equation}
-which is processed by the Transformer-based semantic decoder $S^{-1}_{\phi_s}(\cdot)$. A linear output layer followed by a softmax operation produces the token probability distribution
+which is processed by the personalized Transformer-based semantic decoder $S^{-1}_{\phi_{s,k}}(\cdot)$. Its output token distribution is
 \begin{equation}
-    \mathbf{p}=
+    \mathbf{p}_k
+    =
     \mathrm{Softmax}\left(
-    W_o S^{-1}_{\phi_s}(\hat{\mathbf{h}})+b_o
+    W_{o,k}
+    S^{-1}_{\phi_{s,k}}(\hat{\mathbf{h}}_k)
+    +
+    b_{o,k}
     \right).
 \end{equation}
 
-Rather than retraining the complete end-to-end communication system for a new language, the proposed method keeps the semantic encoder and channel encoder fixed and concentrates the adaptation at the receiver. This design allows the semantic representation generated by a common transmitter to be reused while language-specific knowledge is incorporated into the receiver.
+The transmitter parameters $\theta_s$ and $\theta_c$ are shared and remain fixed during receiver personalization. Consequently, different receivers can reuse the same semantic representation while maintaining receiver-specific parameters for their language or domain specialization. Fig.~\ref{fig:personalized-receivers} illustrates this one-to-many architecture.
+
+\input{figures/tikz/method_pipeline}
 
 \subsection{Teacher--Student Receiver Distillation}
 
@@ -178,9 +201,9 @@ $\lambda_{\mathrm{feat}}=0.1$, with a distillation temperature of $T=2$.
 
 This first stage produces a compact receiver that retains knowledge from the pretrained Teacher while allowing the transmitter to remain unchanged.
 
-\subsection{LoRA-Based Language Adaptation}
+\subsection{LoRA-Based Receiver Personalization}
 
-After knowledge distillation, the trained Student receiver is used as the base model for language-specific adaptation. Instead of fully fine-tuning the receiver, Low-Rank Adaptation (LoRA) \cite{hu2022lora} is introduced into selected attention projections of the Student Transformer decoder.
+After knowledge distillation, each trained Student receiver can be used as the base model for receiver-specific personalization. Instead of fully fine-tuning receiver $\mathcal{R}_k$, Low-Rank Adaptation (LoRA) \cite{hu2022lora} is introduced into selected attention projections of its Transformer decoder. Each receiver maintains its own adaptation parameters while reusing the same frozen transmitter.
 
 For a pretrained linear layer with weight matrix
 $W_0\in\mathbb{R}^{d_{\mathrm{out}}\times d_{\mathrm{in}}}$,
@@ -198,22 +221,29 @@ The adapted transformation is therefore
 \end{equation}
 where $r$ is the LoRA rank and $\alpha$ controls the magnitude of the update.
 
-In the proposed receiver, LoRA is applied to the query, key, value, and output projections of both the decoder self-attention and encoder--decoder attention modules. The original attention projection weights remain frozen, while the low-rank matrices are optimized together with the output prediction head and LayerNorm parameters. The embedding layer remains frozen.
-
-For Portuguese adaptation, an English source sentence is processed by the frozen transmitter and transmitted through the wireless channel. The resulting semantic representation is decoded by the LoRA-adapted Student using the Portuguese target sequence during training. The language-adaptation objective is a masked token-level cross-entropy loss,
+For receiver $\mathcal{R}_k$, LoRA is applied to the query, key, value, and output projections of both the decoder self-attention and encoder--decoder attention modules. The original attention projection weights remain frozen, while receiver-specific low-rank matrices are optimized together with the output prediction head and LayerNorm parameters. The embedding layer remains frozen. Denoting the LoRA matrices of receiver $k$ by $A_k$ and $B_k$, the adapted transformation is
 \begin{equation}
-    \mathcal{L}_{\mathrm{LoRA}}
+    W_k
+    =
+    W_0
+    +
+    \frac{\alpha_k}{r_k}
+    B_k A_k.
+\end{equation}
+
+For a target sequence $\mathbf{t}_k$ associated with receiver $k$, the personalization objective is a masked token-level cross-entropy loss,
+\begin{equation}
+    \mathcal{L}_{\mathrm{adapt}}^{(k)}
     =
     \mathcal{L}_{\mathrm{CE}}
     \left(
-    \mathbf{t}_{\mathrm{PT}},
-    \hat{\mathbf{t}}_{\mathrm{PT}}
+        \mathbf{t}_k,
+        \hat{\mathbf{t}}_k
     \right).
 \end{equation}
+Thus, different receivers can maintain distinct LoRA adapters for different languages or domains without modifying the common semantic transmitter.
 
-Knowledge distillation is not repeated during this stage. Instead, the Student first inherits the Teacher knowledge through the distillation stage and is subsequently specialized to Portuguese through parameter-efficient LoRA adaptation. Fig.~\ref{fig:kd-lora-pipeline} summarizes the resulting two-stage receiver adaptation pipeline.
-
-\input{figures/tikz/method_pipeline}
+In the current Portuguese specialization, an English source sentence is processed by the frozen shared transmitter and the Student receiver is trained against the Portuguese target sequence. Knowledge distillation is not repeated during this stage. Instead, the receiver first inherits the Teacher knowledge through the distillation stage and is subsequently personalized through parameter-efficient LoRA adaptation.
 
 \section*{Acknowledgement}
 This research was funded by CNPq (Brazil), under grants \#444978/2024-0, 201007/2025-8 and \#405026/2024-2.
