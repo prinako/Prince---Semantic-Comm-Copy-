@@ -10,6 +10,7 @@
 \usepackage{graphicx}
 \usepackage{textcomp}
 \usepackage{xcolor}
+\usepackage{booktabs}
 \usepackage{flushend}
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
@@ -244,6 +245,56 @@ For a target sequence $\mathbf{t}_k$ associated with receiver $k$, the personali
 Thus, different receivers can maintain distinct LoRA adapters for different languages or domains without modifying the common semantic transmitter.
 
 In the current Portuguese specialization, an English source sentence is processed by the frozen shared transmitter and the Student receiver is trained against the Portuguese target sequence. Knowledge distillation is not repeated during this stage. Instead, the receiver first inherits the Teacher knowledge through the distillation stage and is subsequently personalized through parameter-efficient LoRA adaptation.
+
+
+\subsection{Training and Inference Procedure}
+
+The proposed receiver personalization is performed in two sequential stages. In the first stage, the pretrained DeepSC model is separated into a shared transmitter and a Teacher receiver. The transmitter and Teacher remain frozen, and a compact Student receiver is trained on the English-to-English task. For each mini-batch, the shared transmitter produces the noisy semantic representation observed by both Teacher and Student. The Student is optimized using the weighted combination of reconstruction, logit-distillation, and decoder-feature alignment losses defined above. This stage transfers the behavior of the larger receiver to a compact receiver without modifying the shared transmitter.
+
+In the second stage, the distilled Student is loaded as the initialization of a personalized receiver $\mathcal{R}_k$. The shared transmitter remains frozen and LoRA modules are inserted into the self-attention and encoder--decoder attention projections of the Student decoder. Language- or domain-specific supervision is then used to update only the receiver-side adaptation parameters. For the Portuguese instance considered in this work, the input remains English while the target sequence is Portuguese. The LoRA stage uses only the masked reconstruction loss; the Teacher is not used again during personalization.
+
+At inference time, the shared transmitter first maps the source sentence to channel symbols independently of the desired receiver specialization. The received semantic representation is then processed by the selected personalized receiver $\mathcal{R}_k$. Each receiver retains its own decoder-side adaptation parameters and therefore can produce a language- or domain-specific output while sharing the same transmitter. The current implementation instantiates one selected personalized receiver at a time; simultaneous multi-receiver deployment is part of the general architecture rather than the present experimental evaluation.
+
+\section{Experimental Setup}
+
+\subsection{Dataset and Task Configuration}
+
+The experiments use parallel text data prepared from the Europarl corpus and stored as tokenized source--target pairs. Each sample is loaded as $(\mathbf{s},\mathbf{t})$, and variable-length sequences are padded within each mini-batch. The maximum sequence length is set to 33 tokens. A shared multilingual vocabulary is used by the transmitter and receivers.
+
+The two training stages use different tasks. Knowledge distillation is performed on the \texttt{en\_en} split, where both the source and target are English. Receiver personalization is then performed on the \texttt{en\_pt} split, where the source is English and the target is Portuguese. This separation allows the Student to first acquire the behavior of the pretrained receiver and subsequently specialize to the target language. Although the architecture supports additional personalized receivers, the current experiments evaluate only the Portuguese specialization.
+
+\subsection{Model and Channel Configuration}
+
+The Teacher follows the pretrained DeepSC configuration with four Transformer layers, eight attention heads, model dimension $d_{\mathrm{model}}=128$, feed-forward dimension $d_{\mathrm{ff}}=512$, and dropout probability 0.1. The compact Student receiver reduces the Transformer decoder to two layers and four attention heads while retaining $d_{\mathrm{model}}=128$ and $d_{\mathrm{ff}}=512$.
+
+\begin{table}[t]
+    \centering
+    \caption{Teacher and Student model configuration.}
+    \label{tab:model-config}
+    \small
+    \begin{tabular}{lcc}
+        \toprule
+        Parameter & Teacher & Student \\
+        \midrule
+        Transformer layers & 4 & 2 \\
+        Attention heads & 8 & 4 \\
+        Model dimension & 128 & 128 \\
+        Feed-forward dimension & 512 & 512 \\
+        Dropout & 0.1 & 0.1 \\
+        Maximum sequence length & 33 & 33 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+The communication implementation supports AWGN, Rayleigh, and Rician channels. The current training configuration uses Rayleigh fading. During training, the SNR is sampled uniformly from 5 to 10~dB, while validation is performed at 8~dB. The same frozen transmitter is used in both the KD and personalization stages.
+
+\subsection{Training Configuration}
+
+For the KD stage, the Student is optimized with Adam using a learning rate of $10^{-4}$, $\beta_1=0.9$, $\beta_2=0.98$, weight decay $5\times10^{-4}$, and gradient clipping with maximum norm 1.0. The training script is configured for 10 epochs with mini-batches of 64 samples. The reconstruction term uses label smoothing of 0.1. The distillation temperature is $T=2$, with loss weights $\lambda_{\mathrm{CE}}=0.6$, $\lambda_{\mathrm{KD}}=0.3$, and $\lambda_{\mathrm{feat}}=0.1$.
+
+For the LoRA personalization stage, the shared transmitter is frozen and the distilled Student receiver is initialized from the KD checkpoint. LoRA is applied to the query, key, value, and output projections of both self-attention and encoder--decoder attention. The Portuguese experiments compare ranks $r\in\{16,32\}$ with $\alpha=32$. The LoRA training script uses mini-batches of 128 samples for up to 50 epochs and a base adapter learning rate of $10^{-4}$. A cosine annealing scheduler is applied with a minimum learning rate of $10^{-6}$, and gradient clipping uses a maximum norm of 1.0.
+
+The optimizer separates the trainable receiver parameters into groups. LoRA parameters use the base adapter learning rate, the output-head weights use the lower head/embedding learning-rate group, and LayerNorm and bias parameters use a separate no-weight-decay group. In the current configuration, the receiver embedding remains frozen, while the output prediction head and LayerNorm parameters are trained together with the LoRA adapters.
 
 \section*{Acknowledgement}
 This research was funded by CNPq (Brazil), under grants \#444978/2024-0, 201007/2025-8 and \#405026/2024-2.
