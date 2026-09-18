@@ -1,0 +1,68 @@
+\begin{figure}[t]
+    \centering
+    \resizebox{\columnwidth}{!}{%
+    \begin{tikzpicture}[
+        node distance=1.15cm and 1.35cm,
+        >=Latex,
+        every node/.style={font=\footnotesize},
+        stage/.style={
+            draw,
+            rounded corners,
+            align=center,
+            minimum width=2.8cm,
+            minimum height=1.0cm,
+            inner sep=5pt
+        },
+        note/.style={
+            align=center,
+            font=\scriptsize,
+            text width=2.8cm
+        },
+        arrow/.style={
+            ->,
+            thick
+        }
+    ]
+
+    \node[stage] (teacher) {
+        Pretrained DeepSC\\
+        Teacher Model
+    };
+
+    \node[stage, right=of teacher] (student) {
+        Compact Student\\
+        Receiver
+    };
+
+    \node[stage, right=of student] (lora) {
+        LoRA-Adapted\\
+        Portuguese Receiver
+    };
+
+    \draw[arrow] (teacher) -- node[above, align=center] {
+        Knowledge\\Distillation
+    } (student);
+
+    \draw[arrow] (student) -- node[above, align=center] {
+        Language\\Adaptation
+    } (lora);
+
+    \node[note, below=0.45cm of teacher] {
+        Frozen transmitter and Teacher receiver
+    };
+
+    \node[note, below=0.45cm of student] {
+        $\mathcal{L}_{\mathrm{CE}}+
+        \mathcal{L}_{\mathrm{KD}}+
+        \mathcal{L}_{\mathrm{feat}}$
+    };
+
+    \node[note, below=0.45cm of lora] {
+        LoRA attention adapters, output head, and LayerNorm
+    };
+
+    \end{tikzpicture}%
+    }
+    \caption{Two-stage receiver adaptation pipeline. A compact Student receiver is first trained from the pretrained DeepSC Teacher through knowledge distillation. The resulting Student is then specialized to Portuguese using LoRA-based language adaptation while the transmitter remains frozen.}
+    \label{fig:kd-lora-pipeline}
+\end{figure}
