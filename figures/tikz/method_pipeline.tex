@@ -2,67 +2,78 @@
     \centering
     \resizebox{\columnwidth}{!}{%
     \begin{tikzpicture}[
-        node distance=1.15cm and 1.35cm,
+        node distance=0.75cm and 1.05cm,
         >=Latex,
         every node/.style={font=\footnotesize},
-        stage/.style={
+        block/.style={
             draw,
             rounded corners,
             align=center,
-            minimum width=2.8cm,
-            minimum height=1.0cm,
-            inner sep=5pt
+            minimum width=2.55cm,
+            minimum height=0.9cm,
+            inner sep=4pt
         },
-        note/.style={
+        receiver/.style={
+            draw,
+            rounded corners,
             align=center,
-            font=\scriptsize,
-            text width=2.8cm
+            minimum width=2.75cm,
+            minimum height=0.82cm,
+            inner sep=4pt
         },
-        arrow/.style={
-            ->,
-            thick
-        }
+        arrow/.style={->, thick}
     ]
 
-    \node[stage] (teacher) {
-        Pretrained DeepSC\\
-        Teacher Model
+    \node[block] (tx) {
+        Shared Transmitter\\
+        Semantic Encoder + Channel Encoder
     };
 
-    \node[stage, right=of teacher] (student) {
-        Compact Student\\
-        Receiver
+    \node[block, right=of tx] (channel) {
+        Wireless\\Channel
     };
 
-    \node[stage, right=of student] (lora) {
-        LoRA-Adapted\\
-        Portuguese Receiver
+    \node[receiver, right=1.30cm of channel, yshift=1.65cm] (pt) {
+        Student Receiver $\mathcal{R}_{\mathrm{PT}}$\\
+        Portuguese Adapter
     };
 
-    \draw[arrow] (teacher) -- node[above, align=center] {
-        Knowledge\\Distillation
-    } (student);
-
-    \draw[arrow] (student) -- node[above, align=center] {
-        Language\\Adaptation
-    } (lora);
-
-    \node[note, below=0.45cm of teacher] {
-        Frozen transmitter and Teacher receiver
+    \node[receiver, below=0.35cm of pt] (es) {
+        Student Receiver $\mathcal{R}_{\mathrm{ES}}$\\
+        Spanish Adapter
     };
 
-    \node[note, below=0.45cm of student] {
-        $\mathcal{L}_{\mathrm{CE}}+
-        \mathcal{L}_{\mathrm{KD}}+
-        \mathcal{L}_{\mathrm{feat}}$
+    \node[receiver, below=0.35cm of es] (fr) {
+        Student Receiver $\mathcal{R}_{\mathrm{FR}}$\\
+        French Adapter
     };
 
-    \node[note, below=0.45cm of lora] {
-        LoRA attention adapters, output head, and LayerNorm
+    \node[receiver, below=0.35cm of fr] (domain) {
+        Student Receiver $\mathcal{R}_{\mathrm{D}}$\\
+        Domain-Specific Adapter
+    };
+
+    \draw[arrow] (tx) -- (channel);
+
+    \coordinate (split) at ($(channel.east)+(0.55,0)$);
+    \draw[thick] (channel.east) -- (split);
+
+    \draw[arrow] (split) |- (pt.west);
+    \draw[arrow] (split) |- (es.west);
+    \draw[arrow] (split) |- (fr.west);
+    \draw[arrow] (split) |- (domain.west);
+
+    \node[align=center, font=\scriptsize, below=0.30cm of tx] {
+        Frozen and reused across receivers
+    };
+
+    \node[align=center, font=\scriptsize, below=0.30cm of domain] {
+        Receiver-specific KD initialization and\\
+        parameter-efficient personalization
     };
 
     \end{tikzpicture}%
     }
-    \caption{Two-stage receiver adaptation pipeline. A compact Student receiver is first trained from the pretrained DeepSC Teacher through knowledge distillation. The resulting Student is then specialized to Portuguese using LoRA-based language adaptation while the transmitter remains frozen.}
-    \label{fig:kd-lora-pipeline}
+    \caption{Shared-transmitter architecture with multiple personalized Student receivers. The semantic and channel encoders are reused across receivers, while each receiver can be specialized for a target language or application domain. Portuguese is the language considered in the current experimental evaluation; the remaining receivers illustrate the general personalization architecture.}
+    \label{fig:personalized-receivers}
 \end{figure}
