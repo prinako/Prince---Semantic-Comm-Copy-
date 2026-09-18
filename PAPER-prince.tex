@@ -72,7 +72,7 @@ Parameter-efficient fine-tuning offers a complementary approach to model adaptat
 
 \subsection{System Overview}
 
-We consider a text semantic communication system in which a pretrained semantic transmitter is retained while the receiver is adapted to recover semantic information in a target language. The communication architecture follows the DeepSC paradigm and consists of a semantic encoder, a channel encoder, a physical wireless channel, a channel decoder, and a Transformer-based semantic decoder.
+We consider a text semantic communication system in which a pretrained semantic transmitter is retained while the receiver is adapted to recover semantic information in a target language. The communication architecture follows the DeepSC paradigm \cite{xie2021deepsc} and consists of a semantic encoder, a channel encoder, a physical wireless channel, a channel decoder, and a Transformer-based semantic decoder.
 
 Let the source sentence be represented by
 \begin{equation}
@@ -134,19 +134,30 @@ Output-level knowledge is transferred from the Teacher through temperature-scale
 \end{equation}
 where $T$ is the distillation temperature and $p_T^{(T)}$ and $p_S^{(T)}$ denote the softened Teacher and Student output distributions, respectively.
 
-Feature-level information is also transferred between the Transformer decoder representations. Let $\mathbf{f}_T$ and $\mathbf{f}_S$ denote the Teacher and Student decoder features at a valid token position. Their alignment is encouraged using a cosine-based feature loss,
+Feature-level information is also transferred between the Transformer decoder representations. Let $\mathbf{f}_{T,i}$ and $\mathbf{f}_{S,i}$ denote the Teacher and Student decoder features at valid token position $i$. The implementation first normalizes the representations as
+\begin{equation}
+    \tilde{\mathbf{f}}_{j,i}
+    =
+    \frac{
+        \mathbf{f}_{j,i}
+    }{
+        \lVert\mathbf{f}_{j,i}\rVert_2+\epsilon
+    },
+    \qquad j\in\{S,T\},
+\end{equation}
+and minimizes the mean-squared deviation of their cosine similarity from unity,
 \begin{equation}
     \mathcal{L}_{\mathrm{feat}}
     =
-    1-
-    \frac{
-        \mathbf{f}_S^{\mathrm{T}}\mathbf{f}_T
-    }{
-        \lVert\mathbf{f}_S\rVert_2
-        \lVert\mathbf{f}_T\rVert_2
-    }.
+    \frac{1}{|\Omega|}
+    \sum_{i\in\Omega}
+    \left(
+        1-
+        \tilde{\mathbf{f}}_{S,i}^{\mathrm{T}}
+        \tilde{\mathbf{f}}_{T,i}
+    \right)^2,
 \end{equation}
-Padding positions are excluded when the feature loss is aggregated across a sequence.
+where $\Omega$ contains the non-padding positions and $\epsilon$ is a small constant for numerical stability.
 
 The overall Student training objective is
 \begin{equation}
@@ -167,7 +178,7 @@ This first stage produces a compact receiver that retains knowledge from the pre
 
 \subsection{LoRA-Based Language Adaptation}
 
-After knowledge distillation, the trained Student receiver is used as the base model for language-specific adaptation. Instead of fully fine-tuning the receiver, Low-Rank Adaptation (LoRA) is introduced into selected attention projections of the Student Transformer decoder.
+After knowledge distillation, the trained Student receiver is used as the base model for language-specific adaptation. Instead of fully fine-tuning the receiver, Low-Rank Adaptation (LoRA) \cite{hu2022lora} is introduced into selected attention projections of the Student Transformer decoder.
 
 For a pretrained linear layer with weight matrix
 $W_0\in\mathbb{R}^{d_{\mathrm{out}}\times d_{\mathrm{in}}}$,
@@ -185,7 +196,7 @@ The adapted transformation is therefore
 \end{equation}
 where $r$ is the LoRA rank and $\alpha$ controls the magnitude of the update.
 
-In the proposed receiver, LoRA is applied to the query, key, value, and output projections of both the decoder self-attention and encoder--decoder attention modules. The base attention weights remain frozen, while only the low-rank matrices are optimized. The implementation additionally permits the output prediction head and LayerNorm parameters to be adapted while the embedding layer remains frozen.
+In the proposed receiver, LoRA is applied to the query, key, value, and output projections of both the decoder self-attention and encoder--decoder attention modules. The original attention projection weights remain frozen, while the low-rank matrices are optimized together with the output prediction head and LayerNorm parameters. The embedding layer remains frozen.
 
 For Portuguese adaptation, an English source sentence is processed by the frozen transmitter and transmitted through the wireless channel. The resulting semantic representation is decoded by the LoRA-adapted Student using the Portuguese target sequence during training. The language-adaptation objective is a masked token-level cross-entropy loss,
 \begin{equation}
