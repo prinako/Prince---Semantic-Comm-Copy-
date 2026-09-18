@@ -16,6 +16,8 @@
 
 \usepackage{caption}
 \usepackage{subcaption}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
 
 \usepackage[ruled,vlined,linesnumbered]{algorithm2e}
 
@@ -209,14 +211,9 @@ For Portuguese adaptation, an English source sentence is processed by the frozen
     \right).
 \end{equation}
 
-Knowledge distillation is not repeated during this stage. Instead, the Student first inherits the Teacher knowledge through the distillation stage and is subsequently specialized to Portuguese through parameter-efficient LoRA adaptation. The complete training pipeline can therefore be summarized as
-\begin{equation}
-    \text{Pretrained DeepSC}
-    \rightarrow
-    \text{KD Student Receiver}
-    \rightarrow
-    \text{LoRA Language Adapter}.
-\end{equation}
+Knowledge distillation is not repeated during this stage. Instead, the Student first inherits the Teacher knowledge through the distillation stage and is subsequently specialized to Portuguese through parameter-efficient LoRA adaptation. Fig.~\ref{fig:kd-lora-pipeline} summarizes the resulting two-stage receiver adaptation pipeline.
+
+\input{figures/tikz/method_pipeline}
 
 \section*{Acknowledgement}
 This research was funded by CNPq (Brazil), under grants \#444978/2024-0, 201007/2025-8 and \#405026/2024-2.
